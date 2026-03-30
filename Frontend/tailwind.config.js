@@ -1,0 +1,9 @@
+export const theme = {
+    extend: {
+        keyframes: {
+            shimmer: {
+                '100%': { transform: 'translateX(100%)' },
+            }
+        }
+    }
+};
