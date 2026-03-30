@@ -25,7 +25,7 @@ function App() {
 
     try {
       const API_URL =
-        import.meta.env.API_URL || "http://localhost:3000/api/fetch"
+        import.meta.env.API_URL || "https://xpath-finder.onrender.com/api/fetch"
       const res = await axios.get(
         `${API_URL}?url=${url}`
       );
