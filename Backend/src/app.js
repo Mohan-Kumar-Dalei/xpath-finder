@@ -23,12 +23,12 @@ app.use(morgan("dev"));
 app.use("/api", fetchRoutes);
 // static serve
 app.use(
-    express.static(path.join(__dirname, "../../frontend/dist"))
+    express.static(path.join(__dirname, "../../Frontend/dist"))
 );
 // SPA fallback
 app.get("*", (req, res) => {
     res.sendFile(
-        path.join(__dirname, "../../frontend/dist/index.html")
+        path.join(__dirname, "../../Frontend/dist/index.html")
     );
 });
 module.exports = app;
