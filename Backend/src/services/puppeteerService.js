@@ -3,12 +3,12 @@
 const puppeteer = require("puppeteer");
 
 const getPageHTML = async (url) => {
-    const browser = await puppeteer.launch({
-        headless: "new",
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
 
     try {
+        const browser = await puppeteer.launch({
+            headless: "new",
+            args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        });
         const page = await browser.newPage();
 
         await page.goto(url, {
@@ -28,7 +28,7 @@ const getPageHTML = async (url) => {
 
         return html;
     } catch (err) {
-        throw err;
+        console.error("Puppeteer error:", err);
     } finally {
         await browser.close();
     }
