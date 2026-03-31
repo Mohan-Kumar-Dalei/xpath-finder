@@ -24,10 +24,8 @@ function App() {
     setHtml(""); // Purana HTML clear karo taaki Skeleton dikhe
 
     try {
-      const API_URL =
-        import.meta.env.API_URL || "https://xpath-finder.onrender.com/api/fetch"
       const res = await axios.get(
-        `${API_URL}?url=${url}`
+        `https://xpath-finder.onrender.com/api/fetch?url=${url}`
       );
 
       const cleanHTML = DOMPurify.sanitize(res.data);
