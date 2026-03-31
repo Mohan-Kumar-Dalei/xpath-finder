@@ -3,6 +3,6 @@
     "scripts": {
         "build": "cd Frontend && npm install && npm run build",
         "start": "cd Backend && npm install && node server.js",
-        "postinstall": "npx puppeteer browsers install chrome"
+        "postinstall": "node node_modules/puppeteer/install.mjs"
     }
 }
