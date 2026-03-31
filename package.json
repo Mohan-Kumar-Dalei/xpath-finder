@@ -3,6 +3,6 @@
     "scripts": {
         "build": "cd Frontend && npm install && npm run build",
         "start": "cd Backend && npm install && node server.js",
-        "postinstall": "node node_modules/puppeteer/install.mjs"
+        "postinstall": "PUPPETEER_SKIP_DOWNLOAD=false node node_modules/puppeteer/install.js"
     }
 }
