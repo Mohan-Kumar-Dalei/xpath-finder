@@ -1,6 +1,6 @@
 // src/services/puppeteerService.js
 
-const puppeteer = require("puppeteer");
+const puppeteer = require("puppeteer-core");
 
 const getPageHTML = async (url) => {
     const browser = await puppeteer.launch({
