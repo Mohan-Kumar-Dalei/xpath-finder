@@ -8,6 +8,16 @@ const getSelectors = (el, doc = document) => {
     let css = [];
 
     // ======================
+    // 🔥 SAFE CLASS GETTER
+    // ======================
+    const getClass = (node) => {
+        if (!node) return "";
+        return typeof node.className === "string"
+            ? node.className
+            : node.getAttribute("class") || "";
+    };
+
+    // ======================
     // 🔥 DEFAULT FULL XPATH
     // ======================
     function getFullXPath(node) {
@@ -42,8 +52,9 @@ const getSelectors = (el, doc = document) => {
         xpaths.push(`//*[@id="${el.id}"]`);
     }
 
-    if (el.className) {
-        const cls = el.className.split(" ")[0];
+    const className = getClass(el);
+    if (className) {
+        const cls = className.split(" ")[0];
         if (cls) {
             xpaths.push(`//${tag}[contains(@class,"${cls}")]`);
         }
@@ -60,8 +71,9 @@ const getSelectors = (el, doc = document) => {
         xpaths.push(`//${tag}[@${attr.name}="${attr.value}"]`);
     }
 
-    if (el.parentElement?.className) {
-        const cls = el.parentElement.className.split(" ")[0];
+    const parentClass = getClass(el.parentElement);
+    if (parentClass) {
+        const cls = parentClass.split(" ")[0];
         if (cls) {
             xpaths.push(
                 `//${el.parentElement.tagName.toLowerCase()}[contains(@class,"${cls}")]/${tag}`
@@ -75,8 +87,8 @@ const getSelectors = (el, doc = document) => {
 
     if (el.id) css.push(`#${el.id}`);
 
-    if (el.className) {
-        const cls = el.className.split(" ")[0];
+    if (className) {
+        const cls = className.split(" ")[0];
         if (cls) {
             css.push(`.${cls}`);
             css.push(`${tag}.${cls}`);
@@ -99,6 +111,6 @@ const getSelectors = (el, doc = document) => {
         xpaths,
         css,
     };
-}
+};
 
 export default getSelectors;

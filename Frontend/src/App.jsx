@@ -25,7 +25,7 @@ function App() {
 
     try {
       const res = await axios.get(
-        `https://xpath-finder.onrender.com/api/fetch?url=${url}`
+        `http://localhost:3000/api/fetch?url=${url}`
       );
 
       const cleanHTML = DOMPurify.sanitize(res.data);
