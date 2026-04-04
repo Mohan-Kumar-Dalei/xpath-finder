@@ -1,23 +1,45 @@
+import { useState, useEffect } from "react";
+import { Clock, Copyright } from "lucide-react"; // 🔥 Premium Lucide Icons
+
 const Footer = () => {
+    // Live time track karne ke liye state
+    const [time, setTime] = useState(new Date());
+
+    // Har second time update karne ke liye useEffect
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setTime(new Date());
+        }, 1000);
+
+        // Cleanup function
+        return () => clearInterval(timer);
+    }, []);
+
     return (
-        <footer className="py-3.5 bg-[#0a0a0a] border-t border-neutral-800/50 flex items-center justify-center relative z-10">
-            <p className="text-sm text-neutral-400 font-medium flex items-center gap-1.5">
-                Code with
-                {/* 💓 Pulsing Heart Emoji */}
-                <span className="text-red-500 text-base inline-block animate-pulse drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]">
-                    ❤️
+        // 🔥 CHANGED: Removed top border, added glassmorphism (bg-opacity + backdrop-blur)
+        <footer className="px-6 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 relative z-10 shrink-0">
+
+            {/* Left Side: Copyright Section */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium tracking-wide">
+                <Copyright size={14} className="text-slate-600" />
+                <span>
+                    {time.getFullYear()} XPath Finder by Mohan. All rights reserved.
                 </span>
-                by
-                {/* ✨ Glowing Name with Portfolio Link */}
-                <a
-                    href="https://mohankumardalei-portfolio.netlify.app"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-yellow-500 hover:text-yellow-400 font-bold tracking-wider hover:underline underline-offset-4 decoration-yellow-500/50 transition-all duration-300"
-                >
-                    Mohan
-                </a>
-            </p>
+            </div>
+
+            {/* Right Side: Real-Time Live Clock */}
+            <div className="flex items-center gap-2 text-xs font-mono font-bold text-amber-500 bg-amber-500/10 px-3 py-1.5 rounded-md border border-amber-500/20 shadow-sm transition-all hover:bg-amber-500/20 hover:shadow-amber-500/10">
+                <Clock size={14} className="animate-pulse" />
+                <span className="tracking-wider">
+                    {time.toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: true
+                    })}
+                </span>
+            </div>
+
         </footer>
     );
 };

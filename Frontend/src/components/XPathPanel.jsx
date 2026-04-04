@@ -1,118 +1,321 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { socket } from "../utils/socket";
+// 🔥 EXACT FIREWORK PRESET
+import { confetti } from "@tsparticles/confetti";
+// 🔥 PREMIUM ICONS IMPORT (Check icon added for save button)
+import { Wrench, Sparkles, Rss, MousePointer2, Copy, Loader2, AlertCircle, Key, Edit3, Check } from "lucide-react";
 
-const XPathPanel = ({ data }) => {
+const XPathPanel = ({ data, html }) => {
     const [mode, setMode] = useState("xpath");
-
     const list = mode === "xpath" ? data?.xpaths : data?.css;
 
-    // 📋 Copy Handler Function
-    const handleCopy = (text, type) => {
+    // ==========================================
+    // 🤖 AI & LOCAL STORAGE STATES
+    // ==========================================
+    const [apiKey, setApiKey] = useState(() => {
+        return localStorage.getItem("gemini_api_key") || "";
+    });
+
+    const [isKeySaved, setIsKeySaved] = useState(() => {
+        return !!localStorage.getItem("gemini_api_key");
+    });
+
+    const [aiInput, setAiInput] = useState("");
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiResults, setAiResults] = useState([]);
+
+    const [feeds, setFeeds] = useState([]);
+
+    const isSiteLoaded = !!html;
+    const isHovered = data && Object.keys(data).length > 0 && data.defaultXPath;
+
+    // ==========================================
+    // 📡 XML / ATOM FEED EXTRACTOR
+    // ==========================================
+    useEffect(() => {
+        if (!html) {
+            setFeeds([]);
+            return;
+        }
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+
+        const feedNodes = doc.querySelectorAll(
+            'link[type="application/rss+xml"], link[type="application/atom+xml"], link[type="application/xml"]'
+        );
+
+        const extractedFeeds = Array.from(feedNodes).map(node => ({
+            title: node.getAttribute("title") || "RSS/Atom Feed",
+            href: node.getAttribute("href"),
+            type: node.getAttribute("type")
+        }));
+
+        setFeeds(extractedFeeds);
+    }, [html]);
+
+    // ==========================================
+    // 🎆 PRO FIREWORK COPY HANDLER
+    // ==========================================
+    const handleCopy = (text, type, e) => {
         if (!text) return;
         navigator.clipboard.writeText(text);
+
+        if (e) {
+            const rect = e.target.getBoundingClientRect();
+            const originX = (rect.left + rect.width / 2) / window.innerWidth;
+            const originY = (rect.top + rect.height / 2) / window.innerHeight;
+
+            confetti({
+                particleCount: 120,
+                spread: 360,
+                startVelocity: 35,
+                decay: 0.92,
+                gravity: 0.8,
+                ticks: 100,
+                origin: { x: originX, y: originY },
+                colors: ["#f59e0b", "#ef4444", "#3b82f6", "#10b981", "#8b5cf6"],
+                shapes: ["circle"],
+                zIndex: 9999
+            });
+        }
+
         toast.success(`${type} copied to clipboard! 📋`, {
-            style: {
-                background: '#1a1a1a',
-                color: '#e5e7eb',
-                border: '1px solid #eab308' // Yellow border
-            }
+            style: { background: '#0f172a', color: '#f1f5f9', border: '1px solid #f59e0b' }
         });
     };
 
-    // ✨ EMPTY STATE: Jab tak koi element select nahi hota
-    if (!data || Object.keys(data).length === 0) {
-        return (
-            <div className="w-[30%] bg-[#0a0a0a] border-l border-neutral-800/50 flex flex-col items-center justify-center p-8 text-center h-full">
-                <div className="w-16 h-16 rounded-full bg-[#121212] border border-neutral-800 flex items-center justify-center mb-4 shadow-[0_0_15px_rgba(255,255,255,0.02)]">
-                    <i className="ri-code-box-line text-3xl text-neutral-600"></i>
-                </div>
-                <h3 className="text-xl font-bold text-gray-200 mb-2 tracking-tight">Inspect Element</h3>
-                <p className="text-sm text-neutral-500 leading-relaxed">
-                    Hover and click on any element in the preview area to generate its XPath and CSS selectors.
-                </p>
-            </div>
-        );
-    }
+    // ==========================================
+    // 🤖 AI SOCKET LOGIC
+    // ==========================================
+    useEffect(() => {
+        socket.connect();
+        socket.on("ai_xpath_generated", (res) => {
+            setAiLoading(false);
+            if (res.success && res.xpaths) {
+                setAiResults(res.xpaths);
+                toast.success("AI Generated Multiple XPaths! ✨");
+            } else {
+                toast.error(res.error || "AI error!");
+            }
+        });
+        return () => {
+            socket.off("ai_xpath_generated");
+            socket.disconnect();
+        };
+    }, []);
 
+    useEffect(() => {
+        if (!html) {
+            setAiInput("");
+            setAiResults([]);
+            setMode("xpath");
+        }
+    }, [html]);
+
+    // 🔥 NAYA FUNCTION: Sirf API Key save karne ke liye
+    const handleSaveKey = () => {
+        const keyToUse = apiKey.trim();
+        if (!keyToUse) {
+            toast.error("API Key cannot be empty! 🛑");
+            return;
+        }
+        localStorage.setItem("gemini_api_key", keyToUse);
+        setIsKeySaved(true);
+        toast.success("API Key securely saved! 🔑");
+    };
+
+    const handleAIFetch = () => {
+        const keyToUse = apiKey.trim();
+
+        if (!keyToUse) return toast.warning("Please enter your Gemini API Key! 🔑");
+        if (!aiInput.trim()) return toast.warning("Target URL ya Title daalo! 🛑");
+        if (!isSiteLoaded) return toast.error("Pehle website load karo!");
+
+        setAiLoading(true);
+        setAiResults([]);
+
+        socket.emit("fetch_ai_xpath", {
+            refData: aiInput,
+            apiKey: keyToUse
+        });
+    };
+
+    // ==========================================
+    // 🎨 UI RENDERING
+    // ==========================================
     return (
-        <div className="w-[30%] bg-[#0a0a0a] border-l border-neutral-800/50 flex flex-col h-full">
+        <div className="w-full h-full flex flex-col overflow-y-auto custom-scrollbar bg-[#0a0f1c] scrollbar-hide">
 
-            {/* Header */}
-            <div className="p-5 border-b border-neutral-800/50 bg-[#0d0d0d]">
-                <h2 className="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-gray-100 to-gray-400 flex items-center gap-2">
-                    <i className="ri-tools-line text-yellow-500"></i>
-                    Selectors
-                </h2>
-            </div>
+            <div className="p-4 flex-1 flex flex-col gap-5">
 
-            <div className="p-5 flex-1 flex flex-col overflow-hidden">
-                {/* 🔥 DEFAULT XPATH CARD */}
-                <div className="mb-6">
-                    <h3 className="text-xs font-bold text-yellow-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                        <i className="ri-star-fill"></i> Default XPath
-                    </h3>
+                {/* 🤖 AI FETCH XPATH SECTION */}
+                <div className={`p-4 border rounded-xl transition-all duration-300 ${isSiteLoaded ? 'bg-[#0f172a]/80 backdrop-blur-sm border-blue-500/30 shadow-[0_4px_20px_rgba(59,130,246,0.05)]' : 'bg-[#0f172a]/40 border-slate-800 opacity-70'}`}>
 
-                    <div
-                        className="group relative p-3 bg-[#121212] border border-yellow-500/30 rounded-xl hover:border-yellow-500 hover:shadow-[0_0_15px_rgba(234,179,8,0.1)] transition-all cursor-pointer flex items-start gap-3"
-                        onClick={() => handleCopy(data?.defaultXPath, "Default XPath")}
-                    >
-                        <div className="flex-1 break-all text-sm text-gray-200 font-mono mt-0.5">
-                            {data?.defaultXPath}
-                        </div>
-                        {/* Copy Icon */}
-                        <div className="w-8 h-8 rounded-lg bg-[#1a1a1a] border border-neutral-700 flex items-center justify-center text-neutral-400 group-hover:bg-yellow-500 group-hover:text-[#0a0a0a] group-hover:border-yellow-500 transition-colors shrink-0">
-                            <i className="ri-clipboard-line"></i>
-                        </div>
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className={`text-[11px] font-bold uppercase tracking-widest flex items-center gap-1.5 ${isSiteLoaded ? 'text-blue-400' : 'text-slate-500'}`}>
+                            <Sparkles size={14} className={isSiteLoaded ? "text-blue-400" : "text-slate-500"} />
+                            Apex AI Fetch
+                        </h3>
+
+                        {/* EDIT KEY BUTTON */}
+                        {isKeySaved && (
+                            <button
+                                onClick={() => setIsKeySaved(false)}
+                                className="text-[10px] font-bold text-slate-500 hover:text-amber-400 transition-colors flex items-center gap-1 bg-[#020817] px-2 py-1 rounded border border-slate-700 hover:border-amber-500/50"
+                            >
+                                <Edit3 size={12} /> Edit Key
+                            </button>
+                        )}
                     </div>
-                </div>
 
-                {/* 🔘 PREMIUM SEGMENTED TOGGLE */}
-                <div className="flex p-1 mb-4 bg-[#121212] border border-neutral-800 rounded-lg">
-                    <button
-                        onClick={() => setMode("xpath")}
-                        className={`flex-1 py-1.5 text-sm font-semibold rounded-md transition-all duration-300 ${mode === "xpath"
-                                ? "bg-[#1a1a1a] text-yellow-500 shadow-sm border border-neutral-700/50"
-                                : "text-neutral-500 hover:text-gray-300"
-                            }`}
-                    >
-                        XPath List
-                    </button>
-                    <button
-                        onClick={() => setMode("css")}
-                        className={`flex-1 py-1.5 text-sm font-semibold rounded-md transition-all duration-300 ${mode === "css"
-                                ? "bg-[#1a1a1a] text-yellow-500 shadow-sm border border-neutral-700/50"
-                                : "text-neutral-500 hover:text-gray-300"
-                            }`}
-                    >
-                        CSS Selectors
-                    </button>
-                </div>
-
-                {/* 🔥 MULTIPLE LIST (Custom Scrollbar UI) */}
-                <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                    {list?.map((item, i) => (
-                        <div
-                            key={i}
-                            className="group relative p-3 bg-[#121212] border border-neutral-800 rounded-lg hover:border-neutral-500 hover:bg-[#151515] transition-all cursor-pointer flex items-center justify-between gap-3"
-                            onClick={() => handleCopy(item, mode === "xpath" ? "XPath" : "CSS Selector")}
-                        >
-                            <div className="flex-1 break-all text-sm text-neutral-300 font-mono group-hover:text-white transition-colors">
-                                {item}
+                    {/* 🔥 API KEY INPUT WITH SAVE BUTTON */}
+                    {!isKeySaved && (
+                        <div className="mb-3 fade-in">
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+                                    <Key size={14} />
+                                </div>
+                                <input
+                                    type="password"
+                                    placeholder="Enter Gemini API Key..."
+                                    value={apiKey}
+                                    onChange={(e) => setApiKey(e.target.value)}
+                                    className="w-full pl-9 pr-12 py-2.5 bg-[#020817] text-slate-200 text-sm border border-slate-700 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all placeholder:text-slate-600"
+                                />
+                                {/* SAVE BUTTON INSIDE INPUT */}
+                                <button
+                                    onClick={handleSaveKey}
+                                    className="absolute inset-y-1.5 right-1.5 px-2.5 bg-blue-500/20 hover:bg-blue-500/40 text-blue-400 rounded-md transition-colors flex items-center justify-center cursor-pointer"
+                                    title="Save Key"
+                                >
+                                    <Check size={14} />
+                                </button>
                             </div>
-                            {/* Copy Icon on Hover */}
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-yellow-500 shrink-0">
-                                <i className="ri-file-copy-line text-lg"></i>
-                            </div>
+                            <p className="text-[9px] text-slate-500 mt-1.5 ml-1 font-medium">Your key is securely stored in your local browser only.</p>
                         </div>
-                    ))}
+                    )}
 
-                    {/* Fallback agar list khali ho */}
-                    {(!list || list.length === 0) && (
-                        <div className="text-center text-neutral-500 text-sm py-4 italic">
-                            No {mode.toUpperCase()} found for this element.
+                    {/* AI REFERENCE INPUT */}
+                    <input
+                        type="text"
+                        placeholder={isSiteLoaded ? "Enter Reference (e.g., Target Title/Class)..." : "Load site to unlock AI..."}
+                        value={aiInput}
+                        onChange={(e) => setAiInput(e.target.value)}
+                        disabled={!isSiteLoaded}
+                        className="w-full mb-3 px-3 py-2.5 bg-[#020817] text-slate-200 text-sm border border-slate-700 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all disabled:cursor-not-allowed placeholder:text-slate-600"
+                    />
+
+                    <button
+                        onClick={handleAIFetch}
+                        disabled={!isSiteLoaded || aiLoading || !isKeySaved}
+                        className="w-full mb-2 py-2.5 bg-blue-600/10 border border-blue-500/30 text-blue-400 font-bold text-sm rounded-lg hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 group cursor-pointer"
+                    >
+                        {aiLoading ? (
+                            <><Loader2 size={16} className="animate-spin" /> Analyzing DOM...</>
+                        ) : (
+                            <><Sparkles size={16} className="group-hover:animate-pulse" /> Generate XPaths</>
+                        )}
+                    </button>
+
+                    {/* AI RESULTS */}
+                    {aiResults && aiResults.length > 0 && (
+                        <div className="scrollbar-hide mt-4 space-y-2 max-h-32 overflow-y-auto custom-scrollbar pr-1">
+                            {aiResults.map((xpath, idx) => (
+                                <div
+                                    key={idx}
+                                    onClick={(e) => handleCopy(xpath, "AI XPath", e)}
+                                    className="p-2.5 bg-[#020817] border border-blue-500/20 rounded-lg text-xs text-slate-300 font-mono break-all cursor-pointer hover:border-blue-500 hover:shadow-[0_0_10px_rgba(59,130,246,0.1)] group flex items-start gap-2 transition-all"
+                                >
+                                    <span className="flex-1 mt-0.5 leading-relaxed">{xpath}</span>
+                                    <Copy size={14} className="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>
+
+                {/* 📡 DISCOVERED FEEDS SECTION */}
+                {isSiteLoaded && (
+                    <div className={`scrollbar-hide p-4 border rounded-xl transition-all duration-300 ${feeds.length > 0 ? 'bg-[#0f172a]/80 backdrop-blur-sm border-emerald-500/30 shadow-[0_4px_20px_rgba(16,185,129,0.05)]' : 'bg-[#0f172a]/40 border-slate-800'}`}>
+                        <h3 className={`text-[11px] font-bold uppercase tracking-widest mb-3 flex items-center gap-1.5 ${feeds.length > 0 ? 'text-emerald-400' : 'text-slate-500'}`}>
+                            <Rss size={14} className={feeds.length > 0 ? "text-emerald-400" : "text-slate-500"} />
+                            Discovered Feeds
+                        </h3>
+
+                        {feeds.length > 0 ? (
+                            <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar pr-1 fade-in">
+                                {feeds.map((feed, idx) => (
+                                    <div
+                                        key={idx}
+                                        onClick={(e) => handleCopy(feed.href, "Feed URL", e)}
+                                        className="group relative p-2.5 bg-[#020817] border border-slate-800 rounded-lg hover:border-emerald-500 transition-all cursor-pointer flex flex-col gap-1.5"
+                                    >
+                                        <span className="text-xs font-bold text-slate-200">{feed.title}</span>
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="text-[10px] text-emerald-400/70 font-mono truncate">{feed.href}</span>
+                                            <Copy size={14} className="text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center p-5 text-center border border-dashed border-slate-800 rounded-lg bg-[#020817]/50 fade-in">
+                                <AlertCircle size={20} className="text-slate-600 mb-2" />
+                                <span className="text-xs font-bold text-slate-400">No Feeds Detected</span>
+                                <p className="text-[10px] text-slate-500 mt-1">We couldn't find any RSS or Atom feeds on this page.</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* 🔥 MANUAL XPATH AREA */}
+                <div className={`scrollbar-hide p-4 border rounded-xl transition-all duration-300 flex-1 flex flex-col ${isHovered ? 'bg-[#0f172a]/80 backdrop-blur-sm border-amber-500/30 shadow-[0_4px_20px_rgba(245,158,11,0.05)]' : 'bg-[#0f172a]/40 border-slate-800'}`}>
+                    <h3 className={`text-[11px] font-bold uppercase tracking-widest mb-3 flex items-center gap-1.5 ${isHovered ? 'text-amber-400' : 'text-slate-500'}`}>
+                        <MousePointer2 size={14} className={isHovered ? "text-amber-400" : "text-slate-500"} />
+                        Manual Inspection
+                    </h3>
+
+                    {!isSiteLoaded ? (
+                        <div className="text-center py-6 text-xs text-slate-500 flex-1 flex flex-col items-center justify-center gap-2">
+                            <Wrench size={24} className="text-slate-700 mb-1" />
+                            Load a URL to start inspecting.
+                        </div>
+                    ) : !isHovered ? (
+                        <div className="text-center py-6 text-xs text-slate-500 italic flex-1 flex flex-col items-center justify-center gap-2">
+                            <MousePointer2 size={24} className="text-slate-700 mb-1 animate-bounce" />
+                            Hover over any element in the preview...
+                        </div>
+                    ) : (
+                        <div className="flex flex-col fade-in flex-1">
+                            <div className="mb-5">
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Primary Selector</p>
+                                <div className="group relative p-3 bg-[#020817] border border-slate-700 rounded-lg hover:border-amber-500 transition-all cursor-pointer flex items-start gap-3 shadow-sm" onClick={(e) => handleCopy(data?.defaultXPath, "Default XPath", e)}>
+                                    <div className="flex-1 break-all text-xs text-amber-100 font-mono mt-0.5 leading-relaxed">{data?.defaultXPath}</div>
+                                    <div className="w-7 h-7 rounded-md bg-slate-800/50 border border-slate-700 flex items-center justify-center text-slate-400 group-hover:bg-amber-500 group-hover:border-amber-500 group-hover:text-slate-900 transition-colors shrink-0">
+                                        <Copy size={14} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex p-1 mb-4 bg-[#020817] border border-slate-800 rounded-lg shrink-0">
+                                <button onClick={() => setMode("xpath")} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${mode === "xpath" ? "bg-amber-500/10 text-amber-400 shadow-sm border border-amber-500/20" : "text-slate-500 hover:text-slate-300 border border-transparent"}`}>XPath List</button>
+                                <button onClick={() => setMode("css")} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${mode === "css" ? "bg-amber-500/10 text-amber-400 shadow-sm border border-amber-500/20" : "text-slate-500 hover:text-slate-300 border border-transparent"}`}>CSS Selectors</button>
+                            </div>
+
+                            <div className="space-y-2 overflow-y-auto custom-scrollbar pr-1 flex-1 min-h-[150px]">
+                                {list?.map((item, i) => (
+                                    <div key={i} className="group relative p-2.5 bg-[#020817] border border-slate-800 rounded-lg hover:border-amber-500/50 transition-all cursor-pointer flex items-center justify-between gap-3" onClick={(e) => handleCopy(item, mode === "xpath" ? "XPath" : "CSS Selector", e)}>
+                                        <div className="flex-1 break-all text-[11px] text-slate-300 font-mono group-hover:text-slate-100 transition-colors">{item}</div>
+                                        <Copy size={14} className="opacity-0 group-hover:opacity-100 transition-opacity text-amber-500 shrink-0" />
+                                    </div>
+                                ))}
+                                {(!list || list.length === 0) && <div className="text-center text-slate-500 text-xs py-4 italic">No {mode.toUpperCase()} found.</div>}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
             </div>
         </div>
     );
