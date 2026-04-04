@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { socket } from "../utils/socket";
 // 🔥 EXACT FIREWORK PRESET
 import { confetti } from "@tsparticles/confetti";
-// 🔥 PREMIUM ICONS IMPORT (Check icon added for save button)
+// 🔥 PREMIUM ICONS IMPORT
 import { Wrench, Sparkles, Rss, MousePointer2, Copy, Loader2, AlertCircle, Key, Edit3, Check } from "lucide-react";
 
 const XPathPanel = ({ data, html }) => {
@@ -31,7 +31,7 @@ const XPathPanel = ({ data, html }) => {
     const isHovered = data && Object.keys(data).length > 0 && data.defaultXPath;
 
     // ==========================================
-    // 📡 XML / ATOM FEED EXTRACTOR
+    // 📡 HYBRID XML / ATOM FEED EXTRACTOR
     // ==========================================
     useEffect(() => {
         if (!html) {
@@ -41,17 +41,53 @@ const XPathPanel = ({ data, html }) => {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, "text/html");
 
-        const feedNodes = doc.querySelectorAll(
-            'link[type="application/rss+xml"], link[type="application/atom+xml"], link[type="application/xml"]'
+        const extractedFeeds = new Map();
+
+        // 1. The Official Way: Look for standard <link> tags in the header
+        const linkNodes = doc.querySelectorAll(
+            'link[type*="rss"], link[type*="atom"], link[rel="alternate"][type*="xml"]'
         );
 
-        const extractedFeeds = Array.from(feedNodes).map(node => ({
-            title: node.getAttribute("title") || "RSS/Atom Feed",
-            href: node.getAttribute("href"),
-            type: node.getAttribute("type")
-        }));
+        linkNodes.forEach(node => {
+            const href = node.getAttribute("href");
+            if (href) {
+                extractedFeeds.set(href, {
+                    title: node.getAttribute("title") || "RSS/Atom Feed",
+                    href: href,
+                    type: node.getAttribute("type") || "application/rss+xml"
+                });
+            }
+        });
 
-        setFeeds(extractedFeeds);
+        // 2. The Smart Way: Aggressively scan <a> tags for feed links (because many sites are messy)
+        const aNodes = doc.querySelectorAll("a[href]");
+
+        aNodes.forEach(node => {
+            const href = node.getAttribute("href");
+            if (!href) return;
+
+            const lowerHref = href.toLowerCase();
+            const textContent = (node.textContent || "").toLowerCase();
+
+            const isLikelyFeed =
+                lowerHref.endsWith('.xml') ||
+                lowerHref.endsWith('.rss') ||
+                lowerHref.endsWith('.atom') ||
+                lowerHref.includes('/feed') ||
+                lowerHref.includes('/rss') ||
+                textContent.includes('rss feed') ||
+                textContent.includes('atom feed');
+
+            if (isLikelyFeed && !extractedFeeds.has(href)) {
+                extractedFeeds.set(href, {
+                    title: node.getAttribute("title") || node.textContent?.trim() || "Discovered Feed Link",
+                    href: href,
+                    type: node.getAttribute("type") || "application/xml"
+                });
+            }
+        });
+
+        setFeeds(Array.from(extractedFeeds.values()));
     }, [html]);
 
     // ==========================================
@@ -80,8 +116,9 @@ const XPathPanel = ({ data, html }) => {
             });
         }
 
-        toast.success(`${type} copied to clipboard! 📋`, {
-            style: { background: '#0f172a', color: '#f1f5f9', border: '1px solid #f59e0b' }
+        toast.success(`${type} copied to clipboard!`, {
+            richColors: true,
+            duration: 1000
         });
     };
 
@@ -96,7 +133,7 @@ const XPathPanel = ({ data, html }) => {
                 setAiResults(res.xpaths);
                 toast.success("AI Generated Multiple XPaths! ✨");
             } else {
-                toast.error(res.error || "AI error!");
+                toast.error(res.error || "AI Error!");
             }
         });
         return () => {
@@ -113,7 +150,6 @@ const XPathPanel = ({ data, html }) => {
         }
     }, [html]);
 
-    // 🔥 NAYA FUNCTION: Sirf API Key save karne ke liye
     const handleSaveKey = () => {
         const keyToUse = apiKey.trim();
         if (!keyToUse) {
@@ -128,9 +164,10 @@ const XPathPanel = ({ data, html }) => {
     const handleAIFetch = () => {
         const keyToUse = apiKey.trim();
 
+        // 🔥 FIX: Translated Hindi alerts to English
         if (!keyToUse) return toast.warning("Please enter your Gemini API Key! 🔑");
-        if (!aiInput.trim()) return toast.warning("Target URL ya Title daalo! 🛑");
-        if (!isSiteLoaded) return toast.error("Pehle website load karo!");
+        if (!aiInput.trim()) return toast.warning("Please enter a Target URL or Title! 🛑");
+        if (!isSiteLoaded) return toast.error("Please load a website first! 🛑");
 
         setAiLoading(true);
         setAiResults([]);
@@ -145,20 +182,19 @@ const XPathPanel = ({ data, html }) => {
     // 🎨 UI RENDERING
     // ==========================================
     return (
-        <div className="w-full h-full flex flex-col overflow-y-auto custom-scrollbar bg-[#0a0f1c] scrollbar-hide">
+        <div className="w-full flex flex-col scrollbar-hide">
 
-            <div className="p-4 flex-1 flex flex-col gap-5">
+            <div className="p-4 flex flex-col gap-5 ">
 
                 {/* 🤖 AI FETCH XPATH SECTION */}
                 <div className={`p-4 border rounded-xl transition-all duration-300 ${isSiteLoaded ? 'bg-[#0f172a]/80 backdrop-blur-sm border-blue-500/30 shadow-[0_4px_20px_rgba(59,130,246,0.05)]' : 'bg-[#0f172a]/40 border-slate-800 opacity-70'}`}>
 
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center justify-between mb-3 ">
                         <h3 className={`text-[11px] font-bold uppercase tracking-widest flex items-center gap-1.5 ${isSiteLoaded ? 'text-blue-400' : 'text-slate-500'}`}>
                             <Sparkles size={14} className={isSiteLoaded ? "text-blue-400" : "text-slate-500"} />
                             Apex AI Fetch
                         </h3>
 
-                        {/* EDIT KEY BUTTON */}
                         {isKeySaved && (
                             <button
                                 onClick={() => setIsKeySaved(false)}
@@ -169,7 +205,6 @@ const XPathPanel = ({ data, html }) => {
                         )}
                     </div>
 
-                    {/* 🔥 API KEY INPUT WITH SAVE BUTTON */}
                     {!isKeySaved && (
                         <div className="mb-3 fade-in">
                             <div className="relative">
@@ -183,7 +218,6 @@ const XPathPanel = ({ data, html }) => {
                                     onChange={(e) => setApiKey(e.target.value)}
                                     className="w-full pl-9 pr-12 py-2.5 bg-[#020817] text-slate-200 text-sm border border-slate-700 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all placeholder:text-slate-600"
                                 />
-                                {/* SAVE BUTTON INSIDE INPUT */}
                                 <button
                                     onClick={handleSaveKey}
                                     className="absolute inset-y-1.5 right-1.5 px-2.5 bg-blue-500/20 hover:bg-blue-500/40 text-blue-400 rounded-md transition-colors flex items-center justify-center cursor-pointer"
@@ -196,7 +230,6 @@ const XPathPanel = ({ data, html }) => {
                         </div>
                     )}
 
-                    {/* AI REFERENCE INPUT */}
                     <input
                         type="text"
                         placeholder={isSiteLoaded ? "Enter Reference (e.g., Target Title/Class)..." : "Load site to unlock AI..."}
@@ -218,9 +251,8 @@ const XPathPanel = ({ data, html }) => {
                         )}
                     </button>
 
-                    {/* AI RESULTS */}
                     {aiResults && aiResults.length > 0 && (
-                        <div className="scrollbar-hide mt-4 space-y-2 max-h-32 overflow-y-auto custom-scrollbar pr-1">
+                        <div className="scrollbar-hide mt-4 space-y-2 max-h-32 overflow-y-auto pr-1">
                             {aiResults.map((xpath, idx) => (
                                 <div
                                     key={idx}
@@ -244,7 +276,7 @@ const XPathPanel = ({ data, html }) => {
                         </h3>
 
                         {feeds.length > 0 ? (
-                            <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar pr-1 fade-in">
+                            <div className="space-y-2 max-h-32 overflow-y-auto scrollbar-hide pr-1 fade-in">
                                 {feeds.map((feed, idx) => (
                                     <div
                                         key={idx}
@@ -303,7 +335,7 @@ const XPathPanel = ({ data, html }) => {
                                 <button onClick={() => setMode("css")} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all ${mode === "css" ? "bg-amber-500/10 text-amber-400 shadow-sm border border-amber-500/20" : "text-slate-500 hover:text-slate-300 border border-transparent"}`}>CSS Selectors</button>
                             </div>
 
-                            <div className="space-y-2 overflow-y-auto custom-scrollbar pr-1 flex-1 min-h-[150px]">
+                            <div className="space-y-2 pb-6">
                                 {list?.map((item, i) => (
                                     <div key={i} className="group relative p-2.5 bg-[#020817] border border-slate-800 rounded-lg hover:border-amber-500/50 transition-all cursor-pointer flex items-center justify-between gap-3" onClick={(e) => handleCopy(item, mode === "xpath" ? "XPath" : "CSS Selector", e)}>
                                         <div className="flex-1 break-all text-[11px] text-slate-300 font-mono group-hover:text-slate-100 transition-colors">{item}</div>

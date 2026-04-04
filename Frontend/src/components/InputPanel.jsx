@@ -2,7 +2,7 @@ import { Link, Zap } from "lucide-react"; // 🔥 Lucide Icons
 
 const InputPanel = ({ url, setUrl, loadSite }) => {
     return (
-        <div className="p-5 bg-[#0f172a] border-b border-slate-800 flex justify-center relative z-10 shadow-sm">
+        <div className="p-5 flex justify-center relative z-10 shadow-sm">
 
             {/* Container with sm:flex-row for better mobile responsiveness */}
             <div className="flex flex-col sm:flex-row gap-4 w-full max-w-4xl relative items-center">

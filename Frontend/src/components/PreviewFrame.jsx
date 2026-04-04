@@ -1,35 +1,72 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import getSelectors from "../utils/getSelectors";
-import { ChevronUp, ChevronDown } from "lucide-react"; // 🔥 Lucide React Import
+import { ChevronUp, ChevronDown } from "lucide-react";
+
+// 🔥 NAKED SCROLLBAR CSS FOR DOM TREE
+const scrollbarStyles = `
+  .naked-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .naked-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .naked-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(148, 163, 184, 0.2);
+    border-radius: 10px;
+  }
+  .naked-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(245, 158, 11, 0.5); /* Amber hover for premium feel */
+  }
+`;
+
+// 🔥 IFRAME INJECTION CSS (For sleek Preview Scrollbar & Y-Axis Only)
+const iframeCustomScrollbar = `
+  <style>
+    ::-webkit-scrollbar {
+      width: 6px !important;
+      height: 6px !important;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent !important;
+    }
+    ::-webkit-scrollbar-thumb {
+      background-color: rgba(15, 23, 42, 0.4) !important; 
+      border-radius: 10px !important;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background-color: rgba(15, 23, 42, 0.7) !important;
+    }
+    body {
+      overflow-x: hidden !important; /* Force Y-Axis Scroll Only */
+    }
+  </style>
+`;
 
 // 🌲 RECURSIVE DOM TREE COMPONENT
 const DOMNode = ({ node, isRoot = false, matchedNodesSet, activeMatchNode }) => {
     const [isExpanded, setIsExpanded] = useState(isRoot);
 
-    // Auto-expand folder if it contains the ACTIVE matched node
     useEffect(() => {
         if (activeMatchNode && node.nodeType === Node.ELEMENT_NODE) {
             const targetNode = activeMatchNode.nodeType === Node.ATTRIBUTE_NODE ? activeMatchNode.ownerElement : activeMatchNode;
             if (node !== targetNode && node.contains(targetNode)) {
-                setIsExpanded(true);
+                setTimeout(() => setIsExpanded(true), 0);
             }
         }
     }, [activeMatchNode, node]);
 
     if (!node) return null;
 
-    // 🔥 HIGHLIGHT STYLES (Updated to Amber Theme)
     const isMatchedElement = matchedNodesSet?.has(node);
     const isActiveElement = activeMatchNode === node;
 
-    // Normal match (Subtle Amber), Active match (Solid Amber/Orange)
     const highlightClass = isActiveElement
         ? "bg-amber-500 text-slate-900 px-1 rounded-sm font-bold shadow-[0_0_10px_rgba(245,158,11,0.5)] transition-all"
         : isMatchedElement
             ? "bg-amber-500/20 border border-amber-500/40 text-amber-200 px-1 rounded-sm font-medium"
             : "";
 
-    // 1. Handle Text Nodes
     if (node.nodeType === Node.TEXT_NODE) {
         const text = node.textContent.trim();
         const isMatchedText = matchedNodesSet?.has(node);
@@ -48,14 +85,11 @@ const DOMNode = ({ node, isRoot = false, matchedNodesSet, activeMatchNode }) => 
         ) : null;
     }
 
-    // 2. Ignore Comments & Scripts
     if (node.nodeType !== Node.ELEMENT_NODE) return null;
     const tagName = node.tagName.toLowerCase();
-    if (['script', 'style', 'noscript', 'meta'].includes(tagName)) return null;
 
     const hasChildren = node.childNodes.length > 0;
 
-    // 3. Render Attributes
     const attributes = Array.from(node.attributes).map(attr => {
         const isAttrMatched = matchedNodesSet?.has(attr);
         const isAttrActive = activeMatchNode === attr;
@@ -76,13 +110,13 @@ const DOMNode = ({ node, isRoot = false, matchedNodesSet, activeMatchNode }) => 
     });
 
     return (
-        <div className="pl-4 font-mono text-[12px] leading-relaxed cursor-default ml-1 border-l border-slate-800 hover:border-slate-600 transition-colors">
+        <div className="pl-4 font-mono text-[12px] leading-relaxed cursor-default ml-1 border-l border-slate-800 hover:border-slate-600 transition-colors inline-block min-w-full">
             <div onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }} className="hover:bg-slate-800/50 px-1 py-0.5 rounded cursor-pointer flex items-start group transition-colors">
                 <span className="w-4 inline-block text-slate-600 group-hover:text-slate-400 select-none shrink-0 transition-colors">
                     {hasChildren ? (isExpanded ? "▼" : "▶") : ""}
                 </span>
 
-                <span className="break-all whitespace-pre-wrap">
+                <span className="whitespace-nowrap">
                     <span className="text-slate-500">&lt;</span>
                     <span id={isActiveElement ? "active-devtools-match" : undefined} className={highlightClass || "text-[#569cd6] font-medium"}>
                         {tagName}
@@ -113,14 +147,18 @@ const PreviewFrame = ({ html, setXpath, isLoading }) => {
     const iframeRef = useRef(null);
     const [activeTab, setActiveTab] = useState("preview");
 
-    // 🔥 XPATH TESTER STATES
     const [xpathQuery, setXpathQuery] = useState("");
     const [testError, setTestError] = useState("");
 
-    // Arrays for parallel matching
     const [devtoolsMatches, setDevtoolsMatches] = useState([]);
     const [iframeMatches, setIframeMatches] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(0);
+
+    // Injecting our custom scrollbar CSS directly into the HTML string for the iframe
+    const processedHtml = useMemo(() => {
+        if (!html) return "";
+        return html + iframeCustomScrollbar;
+    }, [html]);
 
     const parsedDoc = useMemo(() => {
         if (!html) return null;
@@ -131,9 +169,6 @@ const PreviewFrame = ({ html, setXpath, isLoading }) => {
     const matchedNodesSet = useMemo(() => new Set(devtoolsMatches), [devtoolsMatches]);
     const activeMatchNode = devtoolsMatches[currentIndex] || null;
 
-    // ==========================================
-    // 👁️ PREVIEW HOVER LOGIC
-    // ==========================================
     useEffect(() => {
         const iframe = iframeRef.current;
         if (!iframe || !html || activeTab !== "preview") return;
@@ -152,7 +187,7 @@ const PreviewFrame = ({ html, setXpath, isLoading }) => {
                 if (el.hasAttribute('data-devtool-highlight')) return;
 
                 if (prev && !prev.hasAttribute('data-devtool-highlight')) prev.style.outline = "";
-                el.style.outline = "2px solid #ef4444"; // Slate theme red
+                el.style.outline = "2px solid #ef4444";
                 prev = el;
                 setXpath(getSelectors(el, doc));
             };
@@ -164,7 +199,7 @@ const PreviewFrame = ({ html, setXpath, isLoading }) => {
                 if (!el || el.nodeType !== 1 || el.hasAttribute('data-devtool-highlight')) return;
                 isFrozen = true;
                 if (prev && !prev.hasAttribute('data-devtool-highlight')) prev.style.outline = "";
-                el.style.outline = "2px solid #3b82f6"; // Slate theme blue
+                el.style.outline = "2px solid #3b82f6";
                 prev = el;
                 setXpath(getSelectors(el, doc));
             };
@@ -183,9 +218,6 @@ const PreviewFrame = ({ html, setXpath, isLoading }) => {
         };
     }, [html, setXpath, activeTab]);
 
-    // ==========================================
-    // 🛠️ PARALLEL XPATH EVALUATION (DevTools + Iframe)
-    // ==========================================
     const evaluateXPath = (query) => {
         setXpathQuery(query);
         setTestError("");
@@ -232,9 +264,6 @@ const PreviewFrame = ({ html, setXpath, isLoading }) => {
         }
     };
 
-    // ==========================================
-    // 🔄 SYNC HIGHLIGHTS & NAVIGATION (Up/Down)
-    // ==========================================
     const nextMatch = () => {
         if (devtoolsMatches.length > 0) {
             setCurrentIndex((prev) => (prev + 1) % devtoolsMatches.length);
@@ -256,13 +285,13 @@ const PreviewFrame = ({ html, setXpath, isLoading }) => {
             if (el && el.style) {
                 el.setAttribute('data-devtool-highlight', 'true');
                 if (idx === currentIndex) {
-                    el.style.outline = "3px solid #f59e0b"; // amber-500
+                    el.style.outline = "3px solid #f59e0b";
                     el.style.backgroundColor = "rgba(245, 158, 11, 0.3)";
                     if (activeTab === "preview") {
                         el.scrollIntoView({ behavior: "smooth", block: "center" });
                     }
                 } else {
-                    el.style.outline = "2px dashed #fbbf24"; // amber-400
+                    el.style.outline = "2px dashed #fbbf24";
                     el.style.backgroundColor = "rgba(251, 191, 36, 0.1)";
                 }
             }
@@ -271,22 +300,17 @@ const PreviewFrame = ({ html, setXpath, isLoading }) => {
         if (activeTab === "devtools") {
             setTimeout(() => {
                 const activeEl = document.getElementById("active-devtools-match");
-                if (activeEl) activeEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                if (activeEl) activeEl.scrollIntoView({ behavior: "smooth", inline: "center", block: "center" });
             }, 50);
         }
 
     }, [currentIndex, iframeMatches, activeTab]);
 
-    // ==========================================
-    // 🎨 UI RENDERING
-    // ==========================================
     if (isLoading || !html) {
         return (
             <div className="w-full h-full bg-[#020817] flex flex-col p-8 relative overflow-hidden">
                 {isLoading ? (
-                    // 🔥 NAYA PREMIUM BAR-WISE SKELETON LOADER
                     <div className="w-full h-full flex flex-col gap-8 animate-pulse opacity-80 mt-6">
-                        {/* Fake Header/Profile Section */}
                         <div className="flex items-center gap-5">
                             <div className="w-14 h-14 rounded-full bg-slate-800/60 shrink-0"></div>
                             <div className="flex-1 space-y-3">
@@ -294,23 +318,12 @@ const PreviewFrame = ({ html, setXpath, isLoading }) => {
                                 <div className="h-3 bg-slate-800/40 rounded-md w-1/4"></div>
                             </div>
                         </div>
-
-                        {/* Fake Hero/Banner Image */}
                         <div className="w-full h-48 sm:h-64 bg-slate-800/30 rounded-2xl border border-slate-800/50"></div>
-
-                        {/* Fake Text Content Paragraph */}
                         <div className="space-y-4">
                             <div className="h-4 bg-slate-800/50 rounded-md w-full"></div>
                             <div className="h-4 bg-slate-800/50 rounded-md w-[92%]"></div>
                             <div className="h-4 bg-slate-800/50 rounded-md w-[85%]"></div>
                             <div className="h-4 bg-slate-800/50 rounded-md w-[60%]"></div>
-                        </div>
-
-                        {/* Fake Cards Row (for bottom space) */}
-                        <div className="flex gap-4 mt-2">
-                            <div className="flex-1 h-32 bg-slate-800/40 rounded-xl"></div>
-                            <div className="flex-1 h-32 bg-slate-800/40 rounded-xl hidden sm:block"></div>
-                            <div className="flex-1 h-32 bg-slate-800/40 rounded-xl hidden md:block"></div>
                         </div>
                     </div>
                 ) : (
@@ -329,6 +342,7 @@ const PreviewFrame = ({ html, setXpath, isLoading }) => {
 
     return (
         <div className="w-full h-full bg-[#020817] flex flex-col relative">
+            <style>{scrollbarStyles}</style>
 
             {/* 🔥 TOP TOGGLE TABS */}
             <div className="flex bg-[#0f172a] border-b border-slate-800 p-2 gap-2 shrink-0 z-10">
@@ -350,21 +364,21 @@ const PreviewFrame = ({ html, setXpath, isLoading }) => {
                         }`}
                 >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
-                    DOM TREE
+                    INSPECT PANEL
                 </button>
             </div>
 
             {/* 🔥 TAB 1: VISUAL PREVIEW */}
             <div className={`flex-1 w-full bg-white relative ${activeTab === "preview" ? "block" : "hidden"}`}>
-                <iframe ref={iframeRef} srcDoc={html} className="w-full h-full border-none outline-none" title="preview" />
+                <iframe ref={iframeRef} srcDoc={processedHtml} sandbox="allow-same-origin" className="w-full h-full border-none outline-none" title="preview" />
             </div>
 
             {/* 🔥 TAB 2: CHROME DEVTOOLS TREE */}
             <div className={`flex-1 flex flex-col w-full bg-[#020817] overflow-hidden ${activeTab === "devtools" ? "flex" : "hidden"}`}>
-                <div className="flex-1 overflow-auto custom-scrollbar p-4 bg-[#020817] pb-10">
-                    {parsedDoc && parsedDoc.body && (
+                <div className="flex-1 overflow-auto naked-scrollbar p-4 bg-[#020817] pb-10">
+                    {parsedDoc && parsedDoc.documentElement && (
                         <DOMNode
-                            node={parsedDoc.body}
+                            node={parsedDoc.documentElement}
                             isRoot={true}
                             matchedNodesSet={matchedNodesSet}
                             activeMatchNode={activeMatchNode}
@@ -394,7 +408,6 @@ const PreviewFrame = ({ html, setXpath, isLoading }) => {
                         )}
                     </div>
 
-                    {/* Search Controls (Up/Down + Count) */}
                     <div className="flex items-center bg-[#020817] border border-slate-700 rounded-lg overflow-hidden shadow-sm">
                         <span className={`px-3 py-2.5 text-xs font-bold border-r border-slate-700 ${devtoolsMatches.length > 0 ? 'text-amber-500' : 'text-slate-500'}`}>
                             {devtoolsMatches.length > 0 ? `${currentIndex + 1} of ${devtoolsMatches.length}` : '0 Matches'}

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import axios from "axios";
-import DOMPurify from "dompurify";
 import { Toaster, toast } from "sonner";
 import InputPanel from "./components/InputPanel";
 import PreviewFrame from "./components/PreviewFrame";
@@ -9,24 +8,23 @@ import Footer from "./components/Footer";
 
 // 🔥 CUSTOM TEXT-ONLY SHIMMER CSS
 const textShimmerStyles = `
-  @keyframes text-shimmer {
-    0% { background-position: -200% center; }
-    40% { background-position: 200% center; }
-    100% { background-position: 200% center; }
+  @keyframes text-shimmer-continuous {
+    0% { background-position: 200% center; }
+    100% { background-position: -200% center; }
   }
   .shimmer-text {
     background: linear-gradient(
-      90deg, 
-      #94a3b8 0%,    /* Slate-400 (Base Color) */
-      #ffffff 20%,   /* Pure White (Shine Color) */
-      #94a3b8 40%
+      to right, 
+      #94a3b8 20%,    /* Slate-400 (Base Color) */
+      #ffffff 50%,    /* Pure White (Shine Center) */
+      #94a3b8 80%     /* Slate-400 (Base Color) */
     );
     background-size: 200% auto;
     color: transparent;
     -webkit-background-clip: text;
     background-clip: text;
-    /* 2.5s total: 1s me chamkega, 1.5s wait karega */
-    animation: text-shimmer 2.5s infinite; 
+    /* 3s total, linear speed, infinite loop (No pausing) */
+    animation: text-shimmer-continuous 3s linear infinite; 
   }
 `;
 
@@ -48,10 +46,11 @@ function App() {
 
     try {
       const res = await axios.get(
-        `https://xpath-finder.onrender.com/api/fetch?url=${url}`
+        `http://localhost:3000/api/fetch?url=${url}`
       );
-      const cleanHTML = DOMPurify.sanitize(res.data);
-      setHtml(cleanHTML);
+
+      // 100% RAW HTML for accurate feeding and XPath
+      setHtml(res.data);
       toast.success("Website loaded successfully! ✨");
     } catch (err) {
       console.error(err);
@@ -62,56 +61,69 @@ function App() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#020817] text-slate-300 selection:bg-amber-500/30 selection:text-amber-200 font-sans overflow-hidden">
-      {/* Injecting CSS for Text Shimmer */}
+    // Main Wrapper: Strict h-screen, fully responsive, relative for floating footer
+    <div className="h-screen flex flex-col bg-[#020817] text-slate-300 selection:bg-amber-500/30 selection:text-amber-200 font-sans relative overflow-hidden">
+
       <style>{textShimmerStyles}</style>
 
-      <Toaster theme="dark" closeButton={true} richColors position="bottom-right" />
+      <Toaster theme="dark" closeButton={true} richColors position="bottom-right" duration={1000}/>
 
-      {/* Modern Glassmorphic Header */}
-      <header className="px-6 py-4 border-b border-slate-800 bg-[#020817]/90 backdrop-blur-md z-20 flex items-center justify-between shadow-sm shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-lg shadow-amber-500/20">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-100 flex items-center gap-2">
-            XPath
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500">
-              Finder
-            </span>
-            {isLoading && (
-              <span className="relative flex h-2.5 w-2.5 ml-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+      {/* 🔥 FULLY RESPONSIVE HEADER LAYOUT */}
+      <header className="px-4 lg:px-6 py-3 border-b border-slate-800 bg-[#020817]/90 backdrop-blur-md z-20 flex flex-col lg:flex-row items-center justify-between gap-4 shadow-sm shrink-0">
+
+        {/* Left Side: Logo & Loader */}
+        <div className="flex items-center justify-between w-full lg:w-auto">
+          <div className="flex items-center">
+            <h1 className="text-xl lg:text-2xl font-bold tracking-tight text-slate-100 flex items-center whitespace-nowrap">
+              XPath
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500 ml-1.5">
+                Finder
               </span>
-            )}
-          </h1>
+            </h1>
+
+            {/* 🔥 ASLI FIX: Fixed width container (w-6) jo hamesha space reserve karke rakhega. Layout shift nahi hoga! */}
+            <div className="w-6 flex items-center justify-center ml-1">
+              {isLoading && (
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile Badge: Shows on small screens next to the logo */}
+          <div className="flex lg:hidden items-center bg-slate-800/50 px-3 py-1 rounded-full border border-slate-700/50 cursor-default shrink-0">
+            <span className="text-[10px] font-bold tracking-widest flex items-center gap-1">
+              <span className="shimmer-text">MADE WITH</span>
+              <span className="text-red-500 animate-pulse text-[12px]">❤️</span>
+              <span className="shimmer-text">MOHAN</span>
+            </span>
+          </div>
         </div>
 
-        {/* 🔥 Updated: Text-Only Shimmer Effect */}
-        <div className="hidden sm:flex items-center bg-slate-800/50 px-4 py-1.5 rounded-full border border-slate-700/50 cursor-default">
+        {/* Center: Input Panel */}
+        <div className="w-full lg:flex-1 flex justify-center max-w-4xl xl:max-w-4xl">
+          <div className="w-full -my-3 lg:-my-5">
+            <InputPanel url={url} setUrl={setUrl} loadSite={loadSite} />
+          </div>
+        </div>
+
+        {/* Right Side: Desktop Badge */}
+        <div className="hidden lg:flex items-center bg-slate-800/50 px-4 py-1.5 rounded-full border border-slate-700/50 cursor-default shrink-0">
           <span className="text-xs font-bold tracking-widest flex items-center gap-1.5">
-            {/* Shimmer on "Made with" */}
             <span className="shimmer-text">MADE WITH</span>
-
-            {/* Emoji unaffected by gradient */}
             <span className="text-red-500 animate-pulse text-[14px]">❤️</span>
-
-            {/* Shimmer on "Mohan" */}
             <span className="shimmer-text">MOHAN</span>
           </span>
         </div>
+
       </header>
 
-      {/* Input Section */}
-      <section className="bg-[#0f172a] border-b border-slate-800 z-10 shrink-0">
-        <InputPanel url={url} setUrl={setUrl} loadSite={loadSite} />
-      </section>
-
       {/* Dashboard Main Content Area */}
-      <main className="flex flex-1 flex-col lg:flex-row overflow-hidden bg-[#020817] relative">
+      <main className="flex flex-1 flex-col lg:flex-row overflow-hidden bg-[#020817] relative z-0">
+
+        {/* Preview Section */}
         <div className="flex-1 lg:w-[65%] xl:w-[75%] flex flex-col relative border-b lg:border-b-0 lg:border-r border-slate-800">
           <div className="absolute top-0 left-0 w-full px-4 py-2 bg-[#020817]/80 backdrop-blur border-b border-slate-800 z-10 flex justify-between items-center shadow-sm">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
@@ -119,11 +131,13 @@ function App() {
               Live Preview
             </span>
           </div>
+
           <div className="flex-1 overflow-hidden pt-10 bg-white/5">
             <PreviewFrame html={html} setXpath={setSelectors} isLoading={isLoading} />
           </div>
         </div>
 
+        {/* XPath Panel Section */}
         <div className="lg:w-[35%] xl:w-[25%] flex flex-col bg-[#0a0f1c] shrink-0 h-[40vh] lg:h-auto">
           <div className="px-4 py-2 border-b border-slate-800 bg-[#0a0f1c] z-10">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
@@ -131,15 +145,17 @@ function App() {
               Inspector Details
             </span>
           </div>
-          <div className="flex-1 overflow-y-auto custom-scrollbar">
+          <div className="flex-1 overflow-y-auto scrollbar-hide pb-16">
             <XPathPanel data={selectors} html={html} />
           </div>
         </div>
       </main>
 
-      <div className="shrink-0  bg-[#020817]/60 backdrop-blur-lg">
-        <Footer />
-      </div>
+      {/* 🔥 FLOATING GLASS FOOTER */}
+        <div className="pointer-events-auto">
+          <Footer />
+        </div>
+
     </div>
   );
 }
