@@ -1,5 +1,5 @@
 import { useState } from "react";
-import axios from "axios";
+import axios from "./utils/axios";
 import { Toaster, toast } from "sonner";
 import InputPanel from "./components/InputPanel";
 import PreviewFrame from "./components/PreviewFrame";
@@ -45,9 +45,7 @@ function App() {
     setSelectors({});
 
     try {
-      const res = await axios.get(
-        `http://localhost:3000/api/fetch?url=${url}`
-      );
+      const res = await axios.get(`/api/fetch?url=${url}`);
 
       // 100% RAW HTML for accurate feeding and XPath
       setHtml(res.data);
